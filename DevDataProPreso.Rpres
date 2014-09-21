@@ -1,0 +1,79 @@
+Free vs. Paid Courses
+========================================================
+author: Igor Protsenko
+date: Sep 21st, 2014
+transition: zoom
+
+Shiny App in a Nutshell
+========================================================
+
+Coursera's course portfolio is growing very quickly and it's interesting to understand, if this growth is different in free/paid segments for different course categories, languages and audiences.
+
+Shiny App will:
+- Take a Plot Type and Year as Input
+- Get 2014 session data from Coursera API
+- Plot Free/Paid segments for selected Input
+
+UI Screenshot & Plot Types
+========================================================
+![sample UI screenshot](ui.png)
+
+Shiny App offers five plot types:
+- Workload by Language / Audience / Year
+- Number of Courses by Audience / Year
+
+
+Sample Data from Coursera API
+========================================================
+
+- Sample dataset with "Courses" info from Coursera API
+
+```{r, echo=FALSE, cache=TRUE}
+library(XML)
+library(RCurl)
+library(rjson)
+webpage <- getURL("https://api.coursera.org/api/catalog.v1/courses?fields=id,language,targetAudience,estimatedClassWorkload")
+courses <- fromJSON(readLines(textConnection(webpage), warn=F))
+courses <- as.data.frame(do.call(rbind, 
+                                 lapply(lapply(courses[[1]], unlist), 
+                                        "[", unique(unlist(c(sapply(courses[[1]],names)))))))
+courses <- courses[,c(1,4,5,6)]
+names(courses) <- c("id","lang","audience","workload")
+courses$workload <- gsub(" hours/week","",courses$workload)
+courses$workload <- (as.numeric(gsub(".*-","",courses$workload))
+                              +as.numeric(gsub("-.*","",courses$workload)))/2
+head(courses,3)
+```
+
+- Sample dataset with "Sessions" info from Coursera API
+
+```{r, echo=FALSE, cache=TRUE}
+library(XML)
+library(RCurl)
+library(rjson)
+webpage <- getURL("https://api.coursera.org/api/catalog.v1/sessions?fields=id,courseId,startMonth,startYear,signatureTrackPrice,eligibleForSignatureTrack")
+sessions <- fromJSON(readLines(textConnection(webpage), warn=F))
+sessions <- as.data.frame(do.call(rbind, 
+                                  lapply(lapply(sessions[[1]], unlist), 
+                                         "[", unique(unlist(c(sapply(sessions[[1]],names)))))))
+sessions <- sessions[,c(2,4:7)]
+names(sessions) <- c("id","month","year","price","signature")
+sessions$price <- as.numeric(as.character(sessions$price))
+head(sessions,3)
+data <- merge(sessions,courses,by="id")
+data$count <- 1
+```
+
+Sample Plot Produced by the App
+========================================================
+
+```{r, echo=FALSE}
+library(ggplot2)
+temp <- aggregate(count~audience+year+signature,data,sum,na.rm=T)
+ggplot(temp,aes(x=audience,y=count,fill=signature)) + geom_bar(stat="identity") + facet_grid(year~signature)
+```
+
+***
+- First Input: "Number of Courses by Audience"
+- Second Input: "All years"
+- Output: Facets by Free/Paid and Year
